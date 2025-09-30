@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}เพิ่มสินค้าใหม่{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto py-8">
+    <div class="bg-white p-8 rounded-xl shadow-2xl border border-gray-200">
+        <h1 class="text-4xl font-extrabold text-gray-900 mb-6 border-b pb-2">เพิ่มสินค้าใหม่</h1>
+
+        <form method="post" enctype="multipart/form-data" action="{% url 'products:product_create' %}">
+            {% csrf_token %}
+
+            <div class="space-y-6">
+                <div class="p-6 bg-gray-50 rounded-lg shadow-inner">
+                    <h2 class="text-2xl font-semibold text-indigo-700 mb-4">ข้อมูลสินค้าหลัก</h2>
+                    
+                    <div class="mb-4">
+                        <label for="{{ form.name.id_for_label }}" class="block text-sm font-medium text-gray-700">{{ form.name.label }}</label>
+                        {{ form.name }}
+                        {% for error in form.name.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="mb-4">
+                            <label for="{{ form.category.id_for_label }}" class="block text-sm font-medium text-gray-700">{{ form.category.label }}</label>
+                            {{ form.category }}
+                            {% for error in form.category.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}
+                        </div>
+                        <div class="mb-4">
+                            <label for="{{ form.brand.id_for_label }}" class="block text-sm font-medium text-gray-700">{{ form.brand.label }}</label>
+                            {{ form.brand }}
+                            {% for error in form.brand.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="{{ form.description.id_for_label }}" class="block text-sm font-medium text-gray-700">{{ form.description.label }}</label>
+                        {{ form.description }}
+                        {% for error in form.description.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="mb-4">
+                            <label for="{{ form.sku.id_for_label }}" class="block text-sm font-medium text-gray-700">{{ form.sku.label }}</label>
+                            {{ form.sku }}
+                            {% for error in form.sku.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}
+                        </div>
+                        <div class="mb-4">
+                            <label for="{{ form.image.id_for_label }}" class="block text-sm font-medium text-gray-700">{{ form.image.label }}</label>
+                            {{ form.image }}
+                            {% for error in form.image.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-6 bg-indigo-50 rounded-lg shadow-inner">
+                    <h2 class="text-2xl font-semibold text-indigo-700 mb-4">ตัวเลือกหลัก (Default Variant)</h2>
+                    <p class="text-sm text-gray-600 mb-4">ข้อมูลเหล่านี้จะใช้ในการสร้างตัวเลือกแรกของสินค้า</p>
+                    
+                    <div class="mb-4">
+                        <label for="{{ form.variant_size.id_for_label }}" class="block text-sm font-medium text-gray-700">{{ form.variant_size.label }}</label>
+                        {{ form.variant_size }}
+                        {% for error in form.variant_size.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="mb-4">
+                            <label for="{{ form.original_price.id_for_label }}" class="block text-sm font-medium text-gray-700">{{ form.original_price.label }}</label>
+                            {{ form.original_price }}
+                            {% for error in form.original_price.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}
+                        </div>
+                        <div class="mb-4">
+                            <label for="{{ form.current_price.id_for_label }}" class="block text-sm font-medium text-gray-700">{{ form.current_price.label }}</label>
+                            {{ form.current_price }}
+                            {% for error in form.current_price.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}
+                        </div>
+                        <div class="mb-4">
+                            <label for="{{ form.stock.id_for_label }}" class="block text-sm font-medium text-gray-700">{{ form.stock.label }}</label>
+                            {{ form.stock }}
+                            {% for error in form.stock.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-8">
+                <button type="submit" class="w-full py-3 px-4 rounded-md text-lg font-bold text-white bg-green-600 hover:bg-green-700 transition shadow-lg focus:outline-none focus:ring-4 focus:ring-green-300">
+                    บันทึกสินค้าใหม่
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

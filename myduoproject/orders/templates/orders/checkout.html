@@ -1,0 +1,286 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ขั้นตอนที่ 1: ข้อมูลจัดส่งและชำระเงิน</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'Tahoma', 'sans-serif'],
+                    },
+                    colors: {
+                        'primary-blue': '#4c51bf', // Indigo/Blue for primary actions
+                        'primary-green': '#10b981', // Green for confirmation
+                        'soft-bg': '#f9fafb',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom styles for general look and feel */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <!-- Navigation/Header: แก้ไขลิงก์ Navbar ให้ใช้ Namespace และ View Name ที่ถูกต้อง -->
+    <header class="bg-white shadow-sm">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <h1 class="text-xl font-bold text-primary-blue">Pre-order DUO</h1>
+            <nav class="space-x-4 text-sm hidden sm:block">
+                <!-- แก้ไข: 'products:list' เป็น 'products:product_list' (ตาม products/urls.py) -->
+                <a href="{% url 'products:product_list' %}" class="text-gray-600 hover:text-primary-blue">สินค้า</a>
+                <!-- แก้ไข: 'orders:detail' เป็น 'orders:cart' (ตาม orders/urls.py) -->
+                <a href="{% url 'orders:cart' %}" class="text-primary-blue font-semibold border-b-2 border-primary-blue pb-1">ตะกร้าสินค้า</a>
+            </nav>
+            <div class="flex items-center space-x-4">
+                <span class="text-gray-600 text-sm">สวัสดี, admin</span>
+                <!-- ใช้ 'logout' ซึ่งเป็น Global URL Name (ตาม project urls.py) -->
+                <button 
+                    onclick="window.location.href='{% url 'logout' %}'" 
+                    class="bg-primary-blue hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150">
+                    ออกจากระบบ
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="container mx-auto p-4 md:p-8">
+        <h2 class="text-2xl md:text-3xl font-bold text-gray-800 mb-6 border-b pb-2">ขั้นตอนที่ 1: ข้อมูลจัดส่งและชำระเงิน</h2>
+        
+        <!-- START: Main Form for Checkout Submission -->
+        <!-- แก้ไข: 'orders:process_checkout' เป็น 'orders:checkout' (ตาม orders/urls.py) -->
+        <form method="POST" action="{% url 'orders:checkout' %}">
+            {% csrf_token %}
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                
+                <!-- Left Side: Form Content -->
+                <div class="lg:col-span-2 bg-white p-6 rounded-xl shadow-lg">
+                    <h3 class="text-xl font-semibold text-gray-700 mb-4">ที่อยู่จัดส่งและติดต่อ</h3>
+
+                    <!-- Shipping Form Fields -->
+                    <div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label for="first_name" class="block text-sm font-medium text-gray-700 mb-1">ชื่อ-นามสกุล *</label>
+                                <input type="text" id="first_name" name="full_name" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-primary-blue focus:border-primary-blue" required>
+                            </div>
+                            <div>
+                                <label for="phone" class="block text-sm font-medium text-gray-700 mb-1">เบอร์โทรศัพท์ *</label>
+                                <input type="tel" id="phone" name="phone_number" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-primary-blue focus:border-primary-blue" required>
+                            </div>
+                        </div>
+                        <div class="mb-6">
+                            <label for="address" class="block text-sm font-medium text-gray-700 mb-1">ที่อยู่จัดส่ง *</label>
+                            <textarea id="address" name="shipping_address" rows="3" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-primary-blue focus:border-primary-blue" required></textarea>
+                        </div>
+
+                        <h3 class="text-xl font-semibold text-gray-700 mb-4 border-t pt-4">ช่องทางการชำระเงิน *</h3>
+                        
+                        <!-- Payment Options (Radio Buttons) -->
+                        <div class="space-y-3">
+                            <div class="flex items-center">
+                                <input id="transfer" name="payment_method" value="transfer" type="radio" checked class="h-4 w-4 text-primary-blue border-gray-300 focus:ring-primary-blue">
+                                <label for="transfer" class="ml-3 block text-base font-medium text-gray-700">โอนเงินผ่านธนาคาร</label>
+                            </div>
+                            <div class="flex items-center">
+                                <input id="credit_card" name="payment_method" value="credit_card" type="radio" disabled class="h-4 w-4 text-primary-blue border-gray-300 focus:ring-primary-blue opacity-50 cursor-not-allowed">
+                                <label for="credit_card" class="ml-3 block text-base font-medium text-gray-700 opacity-50">บัตรเครดิต/เดบิต (ยังไม่พร้อมใช้งาน)</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Side: Order Summary -->
+                <div class="lg:col-span-1 bg-white p-6 rounded-xl shadow-lg">
+                    <h3 class="text-xl font-semibold text-gray-700 mb-4 border-b pb-3">สรุปคำสั่งซื้อ</h3>
+
+                    <!-- Dynamic Product List (unchanged, relies on Django context) -->
+                    <div class="space-y-2 mb-4 text-sm" id="cart-items-container">
+                        {% for item in cart_items %}
+                        <div class="flex justify-between">
+                            <p class="text-gray-600">{{ item.quantity }} x {{ item.product.name }} ({% if item.variant_display %}{{ item.variant_display }}{% else %}{{ item.product.variant_name }}{% endif %})</p>
+                            <p class="font-medium">{{ item.line_total|floatformat:2 }} บาท</p>
+                        </div>
+                        {% empty %}
+                        <div class="text-center py-4 text-gray-500">
+                            <p>ไม่มีสินค้าในตะกร้า</p>
+                            <p class="text-sm mt-1">โปรดกลับไปที่หน้าสินค้าเพื่อสั่งซื้อ</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <!-- End Product List -->
+
+                    <!-- Discount Code Input Section -->
+                    <div class="border-t pt-4 mt-4">
+                        <label for="coupon-code" class="block text-sm font-semibold text-gray-700 mb-2">โค้ดส่วนลด (ถ้ามี)</label>
+                        <div class="flex space-x-2">
+                            <!-- Hidden input to store applied discount code for form submission -->
+                            <input type="hidden" name="applied_coupon_code" id="applied-coupon-code-hidden" value="">
+                            
+                            <input type="text" id="coupon-code" placeholder="เช่น GEMINI10" class="flex-grow p-2 border border-gray-300 rounded-lg text-sm focus:ring-primary-blue focus:border-primary-blue uppercase">
+                            <button type="button" id="apply-coupon-btn" class="bg-primary-blue hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg text-sm transition duration-150">
+                                ใช้โค้ด
+                            </button>
+                        </div>
+                        <p id="coupon-message" class="text-sm mt-2 text-gray-500">ทดลองใช้: GEMINI10 (10%) หรือ SAVE50 (50 บาท)</p>
+                    </div>
+                    <!-- END Discount Code Input Section -->
+                    
+                    <!-- Price Totals -->
+                    <div class="border-t pt-4 mt-4 space-y-2">
+                        <!-- Hidden input fields to send final calculated totals to Django -->
+                        <input type="hidden" name="final_subtotal" id="final-subtotal-hidden" value="{{ subtotal|floatformat:2 }}">
+                        <input type="hidden" name="final_discount" id="final-discount-hidden" value="0.00">
+                        <input type="hidden" name="final_grand_total" id="final-grand-total-hidden" value="{{ subtotal|floatformat:2 }}">
+                        
+                        <div class="flex justify-between text-gray-700 text-base">
+                            <span>ยอดรวมสินค้า (Subtotal):</span>
+                            <span class="font-medium"><span id="subtotal">{{ subtotal|floatformat:2 }}</span> บาท</span>
+                        </div>
+                        <div class="flex justify-between text-red-500 text-base">
+                            <span>ส่วนลด (Discount):</span>
+                            <span class="font-medium">- <span id="discount">0.00</span> บาท</span>
+                        </div>
+                        <div class="flex justify-between text-2xl font-bold text-gray-800 border-t pt-2">
+                            <span>ยอดชำระสุทธิ:</span>
+                            <span class="text-primary-green"><span id="grand-total">{{ subtotal|floatformat:2 }}</span> บาท</span>
+                        </div>
+                    </div>
+
+                    <!-- Confirm Button: เปลี่ยนเป็น type="submit" เพื่อส่ง Form หลัก -->
+                    <button type="submit" class="w-full bg-primary-green hover:bg-green-600 text-white font-bold py-3 mt-6 rounded-lg shadow-xl transition duration-150">
+                        ยืนยันคำสั่งซื้อ
+                    </button>
+                </div>
+                
+            </div>
+        </form>
+        <!-- END: Main Form -->
+    </main>
+
+    <script>
+        // --- JAVASCRIPT LOGIC FOR DISCOUNT CALCULATION ---
+
+        // START: Dynamically set subtotal from Django context
+        let subtotal = parseFloat('{{ subtotal|floatformat:2 }}');
+        // Fallback for safety in case context variable is missing or cart is empty
+        if (isNaN(subtotal)) {
+            subtotal = 0.00;
+        }
+        // END: Dynamically set subtotal
+
+        let discountAmount = 0.00;
+        let appliedCouponCode = '';
+
+        // Define available coupons and their logic
+        const availableCoupons = {
+            'GEMINI10': { type: 'percentage', value: 0.10, minPurchase: 0 }, // 10% off
+            'SAVE50': { type: 'fixed', value: 50.00, minPurchase: 0 }, // 50 Baht off
+        };
+
+        /**
+         * Calculates the grand total and updates the UI elements.
+         */
+        function calculateTotal() {
+            // Calculate final grand total
+            let finalDiscount = Math.min(discountAmount, subtotal); // Ensure discount doesn't exceed subtotal
+            const grandTotal = subtotal - finalDiscount;
+
+            // Update UI elements with new values
+            document.getElementById('subtotal').textContent = subtotal.toFixed(2);
+            document.getElementById('discount').textContent = finalDiscount.toFixed(2);
+            document.getElementById('grand-total').textContent = grandTotal.toFixed(2);
+
+            // Update hidden fields for form submission to Django
+            document.getElementById('final-subtotal-hidden').value = subtotal.toFixed(2);
+            document.getElementById('final-discount-hidden').value = finalDiscount.toFixed(2);
+            document.getElementById('final-grand-total-hidden').value = grandTotal.toFixed(2);
+            document.getElementById('applied-coupon-code-hidden').value = appliedCouponCode;
+        }
+
+        /**
+         * Applies the entered discount code and updates the discount amount.
+         */
+        function applyDiscount() {
+            const codeInput = document.getElementById('coupon-code').value.toUpperCase().trim();
+            const messageElement = document.getElementById('coupon-message');
+            discountAmount = 0.00; // Reset discount before calculation
+            appliedCouponCode = ''; // Reset applied code
+            
+            // Reset message style and content
+            messageElement.className = 'text-sm mt-2 font-medium text-gray-500'; // Default class
+            messageElement.textContent = `ทดลองใช้: GEMINI10 (10%) หรือ SAVE50 (50 บาท)`;
+
+            const coupon = availableCoupons[codeInput];
+
+            if (coupon) {
+                // Check if subtotal meets minimum purchase requirement
+                if (subtotal >= coupon.minPurchase) {
+                    
+                    // Calculate discount based on type
+                    if (coupon.type === 'percentage') {
+                        discountAmount = subtotal * coupon.value;
+                    } else if (coupon.type === 'fixed') {
+                        discountAmount = coupon.value;
+                    }
+                    
+                    // Set applied code
+                    appliedCouponCode = codeInput;
+
+                    // Success message
+                    messageElement.classList.remove('text-gray-500');
+                    messageElement.classList.add('text-primary-green');
+                    // Ensure displayed discount amount uses the limited value for display purposes
+                    const displayedDiscount = Math.min(discountAmount, subtotal);
+                    messageElement.textContent = `ใช้โค้ดส่วนลด "${codeInput}" สำเร็จ! คุณประหยัดได้ ${displayedDiscount.toFixed(2)} บาท`;
+                
+                } else {
+                    // Minimum purchase requirement not met
+                    messageElement.classList.remove('text-gray-500');
+                    messageElement.classList.add('text-red-600');
+                    messageElement.textContent = `ยอดรวมสินค้าไม่ถึงเกณฑ์ขั้นต่ำ ${coupon.minPurchase.toFixed(2)} บาท สำหรับโค้ดนี้`;
+                }
+            } else if (codeInput) {
+                // Invalid or expired code
+                messageElement.classList.remove('text-gray-500');
+                messageElement.classList.add('text-red-600');
+                messageElement.textContent = 'ไม่พบโค้ดส่วนลดนี้ หรือโค้ดหมดอายุ';
+            }
+
+            // Update totals in the UI and hidden fields
+            calculateTotal();
+        }
+
+        // Initialize on page load
+        window.onload = function() {
+            // Initial total calculation display (using dynamic subtotal)
+            calculateTotal();
+            
+            // Attach event listener to the "Apply" button
+            document.getElementById('apply-coupon-btn').addEventListener('click', function(e) {
+                e.preventDefault(); // Prevent form submission (since this button is type="button")
+                applyDiscount();
+            });
+
+            // Allow pressing Enter key in the input field
+            document.getElementById('coupon-code').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    applyDiscount();
+                }
+            });
+        }
+    </script>
+</body>
+</html>

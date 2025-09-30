@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}{{ product.name }}{% endblock %}
+
+{% block content %}
+<div class="bg-white p-6 rounded-xl shadow-lg grid grid-cols-1 lg:grid-cols-2 gap-8">
+    
+    <!-- Product Image (Placeholder) -->
+    <div class="rounded-lg overflow-hidden bg-gray-100 p-4 flex items-center justify-center">
+        <!-- Assume product.image_url exists for demonstration -->
+        <img src="https://placehold.co/600x400/3730a3/ffffff?text={{ product.name }}" alt="{{ product.name }}" class="object-cover rounded-lg shadow-md">
+    </div>
+
+    <!-- Product Info and Cart Form -->
+    <div>
+        <h1 class="text-4xl font-extrabold text-gray-900 mb-3">{{ product.name }}</h1>
+        <p class="text-gray-500 mb-6">{{ product.category.name }}</p>
+
+        <p class="text-gray-700 mb-6 leading-relaxed">{{ product.description|linebreaks }}</p>
+
+        <!-- Current Price -->
+        <div class="mb-6">
+            <span class="text-5xl font-bold text-red-600" id="current-price">{{ product.default_variant.current_price|floatformat:2 }}</span>
+            <span class="text-xl text-red-600 font-semibold"> บาท</span>
+            {% if product.default_variant.original_price > product.default_variant.current_price %}
+                <span class="text-xl text-gray-400 line-through ml-3">{{ product.default_variant.original_price|floatformat:2 }}</span>
+            {% endif %}
+        </div>
+        
+        <!-- ตำแหน่งสำหรับแสดงข้อความ AJAX Response -->
+        <div id="ajax-message-container" class="mb-4 min-h-[3rem]"></div>
+
+        <!-- Add to Cart Form -->
+        <form id="add-to-cart-form" method="POST" action="{% url 'orders:add_to_cart' %}">
+            {% csrf_token %}
+            
+            <!-- Hidden Input: ใช้สำหรับส่งค่า Variant ID ที่เลือกผ่าน AJAX -->
+            <input type="hidden" name="variant_id" id="variant-id-input" value="{{ product.default_variant.id }}">
+
+            <!-- Variant Selection -->
+            <div class="mb-6">
+                <label for="variant-select" class="block text-lg font-medium text-gray-700 mb-2">เลือกขนาด:</label>
+                <select id="variant-select" name="variant_selection" class="block w-full sm:w-1/2 p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+                    {% for variant in product.variants.all %}
+                        <option 
+                            value="{{ variant.id }}" 
+                            data-price="{{ variant.current_price|floatformat:2 }}" 
+                            {% if variant.stock <= 0 %}disabled{% endif %}
+                            {% if variant == product.default_variant %}selected{% endif %}
+                        >
+                            {{ variant.size }} 
+                            {% if variant.stock <= 0 %} (สินค้าหมด){% endif %}
+                        </option>
+                    {% endfor %}
+                </select>
+                <p id="stock-info" class="mt-2 text-sm {% if product.default_variant.stock > 0 %}text-green-600{% else %}text-red-600{% endif %}">
+                    {% if product.default_variant.stock > 0 %}
+                        มีสินค้าในสต็อก: {{ product.default_variant.stock }} ชิ้น
+                    {% else %}
+                        สินค้าหมดชั่วคราว
+                    {% endif %}
+                </p>
+            </div>
+            
+            <!-- Quantity and Add Button -->
+            <div class="flex items-center space-x-4 mb-8">
+                <div>
+                    <label for="quantity-input" class="block text-lg font-medium text-gray-700 mb-2">จำนวน:</label>
+                    <input type="number" 
+                                id="quantity-input" 
+                                name="quantity" 
+                                value="1" 
+                                min="1" 
+                                max="{{ product.default_variant.stock }}"
+                                class="block w-24 text-center p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                
+                <div class="pt-9 flex-grow">
+                    <button type="submit" 
+                                 id="add-to-cart-btn"
+                                 class="w-full py-3 px-6 rounded-md text-lg font-bold text-white bg-indigo-600 hover:bg-indigo-700 transition shadow-md disabled:opacity-50"
+                                 {% if product.default_variant.stock <= 0 %}disabled{% endif %}>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 inline-block mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                        เพิ่มลงตะกร้า
+                    </button>
+                </div>
+            </div>
+        </form>
+
+        <!-- Product Specs (Optional) -->
+        <div class="border-t pt-4">
+            <h3 class="text-xl font-semibold mb-2 text-gray-700">รายละเอียดเพิ่มเติม</h3>
+            <ul class="text-gray-600 space-y-1">
+                <li>SKU: {{ product.sku }}</li>
+                <li>แบรนด์: {{ product.brand.name }}</li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const variantSelect = document.getElementById('variant-select');
+    const variantIdInput = document.getElementById('variant-id-input');
+    const priceDisplay = document.getElementById('current-price');
+    const stockInfo = document.getElementById('stock-info');
+    const quantityInput = document.getElementById('quantity-input');
+    const addToCartBtn = document.getElementById('add-to-cart-btn');
+    const form = document.getElementById('add-to-cart-form');
+    const messageContainer = document.getElementById('ajax-message-container');
+
+    // Mapped stock from Django context
+    const allVariantsStock = {
+        {% for variant in product.variants.all %}
+            "{{ variant.id }}": {{ variant.stock }}{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    };
+
+    function updateProductDisplay() {
+        const selectedOption = variantSelect.options[variantSelect.selectedIndex];
+        const selectedPrice = selectedOption.dataset.price;
+        const selectedVariantId = selectedOption.value;
+        const stock = allVariantsStock[selectedVariantId];
+        
+        // 1. Update Hidden Input and Price
+        variantIdInput.value = selectedVariantId;
+        priceDisplay.textContent = parseFloat(selectedPrice).toFixed(2);
+        
+        // 2. Update Stock Info and Buttons
+        if (stock > 0) {
+            stockInfo.textContent = `มีสินค้าในสต็อก: ${stock} ชิ้น`;
+            stockInfo.className = 'mt-2 text-sm text-green-600';
+            quantityInput.max = stock;
+            quantityInput.disabled = false;
+            addToCartBtn.disabled = false;
+        } else {
+            stockInfo.textContent = 'สินค้าหมดชั่วคราว';
+            stockInfo.className = 'mt-2 text-sm text-red-600';
+            quantityInput.max = 1;
+            quantityInput.value = 1;
+            quantityInput.disabled = true;
+            addToCartBtn.disabled = true;
+        }
+        
+        // 3. Reset quantity if it exceeds max stock
+        if (parseInt(quantityInput.value) > stock) {
+            quantityInput.value = stock > 0 ? 1 : 0;
+        }
+    }
+
+    variantSelect.addEventListener('change', updateProductDisplay);
+    
+    // Helper function สำหรับแสดงข้อความ (แทน alert())
+    function showMessage(type, content) {
+        messageContainer.innerHTML = ''; // Clear container immediately
+
+        // Clear previous messages after 4 seconds
+        setTimeout(() => {
+            messageContainer.innerHTML = '';
+        }, 4000);
+
+        const alertClass = type === 'success' 
+            ? 'bg-green-100 border-green-400 text-green-700' 
+            : 'bg-red-100 border-red-400 text-red-700';
+            
+        messageContainer.innerHTML = `
+            <div class="border px-4 py-3 rounded relative ${alertClass}" role="alert">
+                <span class="block sm:inline">${content}</span>
+            </div>
+        `;
+    }
+
+    // AJAX for Add to Cart
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        messageContainer.innerHTML = ''; // Clear message container on submit
+        
+        if (addToCartBtn.disabled || parseInt(quantityInput.value) < 1 || !variantIdInput.value) {
+            showMessage('error', 'โปรดเลือกสินค้าและระบุจำนวนที่ถูกต้อง');
+            return;
+        }
+        
+        // 1. สร้าง FormData Object จาก Form
+        const formData = new FormData(form);
+        
+        // *** DEBUG STEP: ตรวจสอบค่าที่กำลังจะส่ง (ยังคงอยู่) ***
+        const variantId = formData.get('variant_id');
+        const quantity = formData.get('quantity');
+
+        console.log("--- DEBUG: AJAX Data ---");
+        console.log("URL:", form.action);
+        // CSRF Token จะถูกรวมอยู่ใน FormData โดยอัตโนมัติจาก input hidden
+        console.log("Sending variant_id:", variantId);
+        console.log("Sending quantity:", quantity);
+        console.log("-------------------------");
+        
+        // ปรับสถานะปุ่มและแสดงข้อความโหลด
+        addToCartBtn.disabled = true;
+        const originalText = addToCartBtn.innerHTML;
+        addToCartBtn.innerHTML = '<svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>กำลังเพิ่ม...';
+
+        try {
+            const response = await fetch(form.action, {
+                method: 'POST',
+                // **สำคัญ:** ไม่ต้องกำหนด Content-Type Header 
+                // fetch จะจัดการ `multipart/form-data` อัตโนมัติเมื่อ body เป็น FormData
+                body: formData 
+                // เนื่องจาก form มี {% csrf_token %} อยู่แล้ว
+            });
+            
+            if (response.status === 200) {
+                const data = await response.json();
+                showMessage('success', data.message || "เพิ่มสินค้าลงในตะกร้าสำเร็จ!");
+                // อัปเดต Nav Bar หรือ UI อื่นๆ ที่เกี่ยวข้อง
+            } else if (response.status === 400 || response.status === 404) {
+                // ดักจับ error 400 จาก Django View
+                const data = await response.json();
+                showMessage('error', data.error || `เกิดข้อผิดพลาดในการเพิ่มสินค้า (Status: ${response.status})`);
+                console.error('Server error response:', data);
+            } else {
+                showMessage('error', `เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์ (HTTP Status: ${response.status})`);
+                console.error('Unexpected HTTP status:', response.status);
+            }
+        } catch (error) {
+            console.error('Fetch error:', error);
+            showMessage('error', "เกิดข้อผิดพลาดเครือข่าย โปรดลองอีกครั้ง");
+        } finally {
+            // คืนค่าปุ่ม
+            addToCartBtn.disabled = false;
+            addToCartBtn.innerHTML = originalText;
+            updateProductDisplay();
+        }
+    });
+
+    // Initial update on load
+    updateProductDisplay();
+
+    // *** ข้อความเตือนเพื่อแก้ปัญหา Cache ***
+    console.log("!!! กรุณา Hard Refresh (Ctrl+Shift+R หรือ Cmd+Shift+R) เพื่อให้โค้ด JavaScript ใหม่มีผล !!!");
+</script>
+{% endblock %}

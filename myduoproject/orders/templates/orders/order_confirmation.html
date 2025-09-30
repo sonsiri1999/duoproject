@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}ยืนยันการสั่งซื้อสำเร็จ{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto bg-white p-8 rounded-lg shadow-2xl text-center">
+    
+    <svg class="mx-auto h-16 w-16 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+    </svg>
+    <h1 class="text-3xl font-extrabold text-gray-900 mt-4 mb-2">ขอบคุณ! การสั่งซื้อเสร็จสมบูรณ์</h1>
+    <p class="text-gray-600 mb-6">เราได้รับคำสั่งซื้อของคุณแล้ว หมายเลขคำสั่งซื้อคือ:</p>
+
+    <div class="bg-indigo-50 p-4 inline-block rounded-lg mb-8">
+        <p class="text-2xl font-bold text-indigo-700">{{ order.order_number }}</p>
+    </div>
+
+    <!-- Order Summary -->
+    <div class="text-left border-t border-b py-6 mb-6">
+        <h2 class="text-xl font-semibold text-gray-800 mb-4">สรุปรายละเอียดคำสั่งซื้อ</h2>
+        
+        <div class="space-y-3">
+            <div class="flex justify-between">
+                <span class="text-gray-600">วันที่สั่งซื้อ:</span>
+                <span class="font-medium">{{ order.created_at|date:"d M Y, H:i" }}</span>
+            </div>
+            <div class="flex justify-between">
+                <span class="text-gray-600">ยอดรวมสินค้า:</span>
+                <span class="font-medium">{{ order.total_amount|floatformat:2 }} บาท</span>
+            </div>
+            <div class="flex justify-between">
+                <span class="text-gray-600">ส่วนลด:</span>
+                <span class="font-medium text-green-600">- {{ order.discount_amount|floatformat:2 }} บาท</span>
+            </div>
+            <div class="flex justify-between border-t pt-3 font-bold text-lg">
+                <span>ยอดชำระสุทธิ:</span>
+                <span class="text-indigo-600">{{ order.grand_total|floatformat:2 }} บาท</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Shipping Details -->
+    <div class="text-left mb-6 p-4 border rounded-lg bg-gray-50">
+        <h3 class="text-lg font-semibold text-gray-800 mb-2">ที่อยู่จัดส่ง</h3>
+        <p class="text-gray-700 whitespace-pre-line">{{ order.shipping_address }}</p>
+        <p class="text-sm text-gray-500 mt-2">เบอร์โทรศัพท์: {{ order.phone_number }}</p>
+        <p class="text-sm text-gray-500">อีเมล: {{ order.email }}</p>
+    </div>
+
+    <a href="{% url 'product_list' %}" class="mt-4 inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 transition duration-150">
+        กลับสู่หน้าแรก
+    </a>
+</div>
+{% endblock %}

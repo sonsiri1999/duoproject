@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+
+{% block title %}ตะกร้าสินค้า{% endblock %}
+
+{% block content %}
+<div class="bg-white p-6 rounded-lg shadow-xl">
+    <h1 class="text-3xl font-extrabold text-gray-900 mb-6 border-b pb-2">ตะกร้าสินค้าของคุณ</h1>
+
+    {% if cart_items %}
+    <div class="lg:grid lg:grid-cols-3 lg:gap-8">
+        <!-- Cart Items (Left/Main Section) -->
+        <div class="lg:col-span-2 space-y-4">
+            <div id="cart-messages" class="hidden p-3 rounded-md text-sm font-medium"></div>
+
+            <form id="cart-update-form" action="{% url 'update_cart' %}" method="POST">
+                {% csrf_token %}
+                
+                {% for item in cart_items %}
+                <div id="item-{{ item.pk }}" class="flex items-center border-b pb-4 mb-4">
+                    <!-- Product Image/Details -->
+                    <div class="w-20 h-20 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden mr-4">
+                        <img src="{{ item.variant.product.image.url|default:'https://placehold.co/80x80/a5b4fc/ffffff?text=Item' }}" 
+                             alt="{{ item.variant.product.name }}" class="w-full h-full object-cover">
+                    </div>
+
+                    <!-- Name and Variant -->
+                    <div class="flex-grow">
+                        <h2 class="text-lg font-semibold text-gray-800">{{ item.variant.product.name }}</h2>
+                        <p class="text-sm text-gray-600">{{ item.variant.size }}</p>
+                    </div>
+
+                    <!-- Quantity Input -->
+                    <div class="flex items-center mx-4">
+                        <label for="qty-{{ item.pk }}" class="sr-only">จำนวน</label>
+                        <input type="number" id="qty-{{ item.pk }}" name="quantity_{{ item.pk }}" 
+                               value="{{ item.quantity }}" min="1" max="{{ item.variant.stock }}"
+                               data-item-id="{{ item.pk }}"
+                               class="w-16 text-center border-gray-300 rounded-md shadow-sm text-sm p-1 quantity-input">
+                    </div>
+
+                    <!-- Price -->
+                    <div class="w-24 text-right">
+                        <p class="text-base font-medium text-gray-900">
+                            {{ item.subtotal|floatformat:2 }} บาท
+                        </p>
+                    </div>
+
+                    <!-- Remove Button -->
+                    <button type="button" data-item-id="{{ item.pk }}" class="ml-4 text-red-500 hover:text-red-700 remove-item-btn">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+                {% endfor %}
+            </form>
+        </div>
+
+        <!-- Summary and Checkout (Right Section) -->
+        <div class="lg:col-span-1 bg-gray-50 p-6 rounded-lg shadow-inner sticky top-20 h-fit">
+            <h2 class="text-2xl font-bold text-gray-900 mb-4">สรุปคำสั่งซื้อ</h2>
+            
+            <div class="space-y-3 mb-6 border-b pb-4">
+                <div class="flex justify-between">
+                    <span class="text-gray-600">ราคารวมสินค้า:</span>
+                    <span id="subtotal_display" class="font-medium">{{ total_subtotal|floatformat:2 }} บาท</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">ส่วนลดโปรโมชั่น:</span>
+                    <span id="discount_display" class="font-medium text-green-600">- {{ total_discount|floatformat:2 }} บาท</span>
+                </div>
+                <div class="flex justify-between pt-2 border-t mt-3">
+                    <span class="text-xl font-bold">ยอดรวมสุทธิ:</span>
+                    <span id="total_display" class="text-xl font-bold text-indigo-600">{{ total_grand|floatformat:2 }} บาท</span>
+                </div>
+            </div>
+
+            <!-- Promotion Code Form -->
+            <form id="apply-promotion-form" action="{% url 'apply_promotion' %}" method="POST" class="mb-6">
+                {% csrf_token %}
+                <label for="promotion_code" class="block text-sm font-medium text-gray-700 mb-2">โค้ดโปรโมชั่น</label>
+                <div class="flex space-x-2">
+                    <input type="text" id="promotion_code" name="code" placeholder="ใส่โค้ดที่นี่"
+                           class="flex-grow border-gray-300 rounded-md shadow-sm p-2 text-sm focus:ring-indigo-500 focus:border-indigo-500">
+                    <button type="submit" id="apply-promo-btn"
+                            class="bg-indigo-500 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-600 transition duration-150">
+                        ใช้โค้ด
+                    </button>
+                </div>
+                <div id="promo-status" class="text-sm mt-2"></div>
+            </form>
+
+            <a href="{% url 'checkout' %}" id="checkout-btn"
+               class="w-full block text-center bg-green-600 text-white py-3 rounded-lg font-bold text-lg hover:bg-green-700 transition duration-150">
+                ดำเนินการชำระเงิน
+            </a>
+        </div>
+    </div>
+    {% else %}
+        <div class="text-center py-10">
+            <p class="text-gray-500 text-xl mb-4">ตะกร้าสินค้าว่างเปล่า</p>
+            <a href="{% url 'product_list' %}" class="text-indigo-600 hover:text-indigo-800 font-medium">กลับไปเลือกซื้อสินค้า</a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const cartUpdateForm = document.getElementById('cart-update-form');
+        const quantityInputs = document.querySelectorAll('.quantity-input');
+        const removeItemButtons = document.querySelectorAll('.remove-item-btn');
+        const applyPromotionForm = document.getElementById('apply-promotion-form');
+        const promoStatus = document.getElementById('promo-status');
+        const cartMessages = document.getElementById('cart-messages');
+
+        // Helper function to show cart status messages
+        function showMessage(message, isSuccess = true) {
+            cartMessages.textContent = message;
+            cartMessages.classList.remove('hidden', 'message-success', 'message-error');
+            if (isSuccess) {
+                cartMessages.classList.add('message-success');
+            } else {
+                cartMessages.classList.add('message-error');
+            }
+            setTimeout(() => {
+                cartMessages.classList.add('hidden');
+            }, 5000);
+        }
+
+        // 1. Cart Item Update/Remove Handler
+        function handleCartAction(itemId, quantity = null) {
+            const isRemove = quantity === 0;
+            const url = isRemove ? `{% url 'remove_from_cart' 0 %}`.replace('0', itemId) : cartUpdateForm.action;
+            const method = isRemove ? 'POST' : 'POST'; 
+            
+            const formData = new URLSearchParams();
+            formData.append('csrfmiddlewaretoken', cartUpdateForm.querySelector('[name=csrfmiddlewaretoken]').value);
+            
+            if (!isRemove) {
+                // For updating quantity
+                const inputName = `quantity_${itemId}`;
+                formData.append(inputName, quantity);
+            } else {
+                // For removing item
+                formData.append('item_id', itemId);
+            }
+
+            fetch(url, {
+                method: method,
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Update Summary
+                    document.getElementById('subtotal_display').textContent = `${data.total_subtotal.toFixed(2)} บาท`;
+                    document.getElementById('discount_display').textContent = `- ${data.total_discount.toFixed(2)} บาท`;
+                    document.getElementById('total_display').textContent = `${data.total_grand.toFixed(2)} บาท`;
+                    
+                    // Update Item List or Remove Item
+                    if (isRemove || data.quantity === 0) {
+                        const itemElement = document.getElementById(`item-${itemId}`);
+                        if (itemElement) itemElement.remove();
+                        showMessage(data.message || 'สินค้าถูกลบออกจากตะกร้าแล้ว', true);
+
+                        // If cart is now empty, reload page to show empty state
+                        if (data.cart_items_count === 0) {
+                             window.location.reload();
+                        }
+
+                    } else if (data.quantity !== undefined) {
+                        // Update individual item total
+                        const itemElement = document.getElementById(`item-${itemId}`);
+                        const priceElement = itemElement.querySelector('.w-24 p');
+                        priceElement.textContent = `${(data.quantity * data.item_unit_price).toFixed(2)} บาท`;
+                        showMessage('จำนวนสินค้าถูกอัพเดทแล้ว', true);
+                    }
+                } else {
+                    showMessage(data.message || 'เกิดข้อผิดพลาดในการอัพเดทตะกร้า', false);
+                    // Revert quantity input if update failed (e.g., stock issue)
+                    if (!isRemove) {
+                        const input = document.getElementById(`qty-${itemId}`);
+                        if(input) input.value = data.current_quantity || 1;
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showMessage('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์', false);
+            });
+        }
+
+
+        // Event listener for quantity change
+        quantityInputs.forEach(input => {
+            input.addEventListener('change', function() {
+                const itemId = this.getAttribute('data-item-id');
+                const quantity = parseInt(this.value);
+                if (quantity > 0) {
+                    handleCartAction(itemId, quantity);
+                } else {
+                    this.value = 1; // Prevent setting to 0 via change, use remove button instead
+                }
+            });
+        });
+
+        // Event listener for remove button
+        removeItemButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const itemId = this.getAttribute('data-item-id');
+                handleCartAction(itemId, 0); // Send 0 to signify removal
+            });
+        });
+
+        // 2. Promotion Code Handler
+        applyPromotionForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const code = formData.get('code');
+            if (!code) {
+                promoStatus.textContent = 'กรุณาใส่โค้ดโปรโมชั่น';
+                promoStatus.classList.remove('text-green-600');
+                promoStatus.classList.add('text-red-600');
+                return;
+            }
+
+            fetch(this.action, {
+                method: 'POST',
+                body: new URLSearchParams(formData),
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                promoStatus.classList.remove('text-green-600', 'text-red-600');
+                if (data.success) {
+                    promoStatus.textContent = `ใช้โค้ด ${code} สำเร็จ!`;
+                    promoStatus.classList.add('text-green-600');
+                    // Update Summary
+                    document.getElementById('subtotal_display').textContent = `${data.total_subtotal.toFixed(2)} บาท`;
+                    document.getElementById('discount_display').textContent = `- ${data.total_discount.toFixed(2)} บาท`;
+                    document.getElementById('total_display').textContent = `${data.total_grand.toFixed(2)} บาท`;
+                    showMessage('โค้ดโปรโมชั่นถูกใช้งานแล้ว', true);
+                } else {
+                    promoStatus.textContent = data.message || 'โค้ดไม่ถูกต้องหรือไม่สามารถใช้ได้';
+                    promoStatus.classList.add('text-red-600');
+                    showMessage(data.message || 'ไม่สามารถใช้โค้ดโปรโมชั่นได้', false);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                promoStatus.textContent = 'เกิดข้อผิดพลาดในการเชื่อมต่อ';
+                promoStatus.classList.add('text-red-600');
+            });
+        });
+    });
+</script>
+{% endblock %}

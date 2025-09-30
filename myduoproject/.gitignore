@@ -1,0 +1,17 @@
+Python / Django specific ignores
+pycache/
+*.pyc
+*.log
+.DS_Store
+.env
+venv/
+env/
+
+Django specific
+*.sqlite3
+db.sqlite3
+/media/
+
+IDE specific (VSCode, PyCharm)
+.vscode/
+.idea/
