@@ -11,8 +11,10 @@ from .models import Cart, CartItem, Order, OrderItem
 from promotions.models import Promotion 
 from .cart import CartManager # <--- ใช้ CartManager ตัวเดียวเท่านั้น
 import uuid
-from decimal import Decimal
-
+from decimal import Decimal, InvalidOperation
+from promotions.models import Promotion , DiscountType
+import json
+from django.views.decorators.csrf import csrf_exempt
 # ----------------------------------------------------------------------
 # *** FIX: ลบฟังก์ชัน _get_or_create_cart(request) ที่ล้าสมัยออก ***
 # ตอนนี้ CartManager จะทำหน้าที่นี้ทั้งหมด
@@ -218,12 +220,7 @@ def apply_promotion(request):
     
     messages.success(request, f"ใช้โค้ด {code} เรียบร้อยแล้ว! ได้รับส่วนลด {cart.discount_amount:.2f} บาท")
     return redirect('orders:cart_summary')
-
-
-# ----------------------------------------------------------------------
-# Checkout Views
-# ----------------------------------------------------------------------
-
+\
 class CheckoutView(View):
     """จัดการขั้นตอนการชำระเงินและการสร้างคำสั่งซื้อ"""
     template_name = 'orders/checkout.html'
@@ -234,7 +231,6 @@ class CheckoutView(View):
         if request.user.is_authenticated:
             try:
                 # สมมติว่ามี UserProfile หรือโมเดลที่เก็บข้อมูลที่อยู่/ติดต่อ
-                # และ CheckoutForm มีฟิลด์ 'full_name', 'email', 'phone_number', 'shipping_address'
                 # **กรุณาปรับโค้ดส่วนนี้ให้เข้ากับโครงสร้าง Model ของคุณ**
                 profile = request.user.userprofile 
                 
@@ -243,10 +239,8 @@ class CheckoutView(View):
                     'email': profile.user.email,
                     'phone_number': profile.default_phone_number,
                     'shipping_address': profile.default_shipping_address,
-                    # สามารถเพิ่มข้อมูลอื่นๆ ที่จำเป็นได้
                 }
             except AttributeError:
-                # หาก UserProfile ยังไม่มีข้อมูล หรือโมเดลไม่มีฟิลด์ที่ต้องการ
                 pass
         return initial_data
 
@@ -259,20 +253,26 @@ class CheckoutView(View):
             messages.warning(request, "ตะกร้าสินค้าว่างเปล่า ไม่สามารถดำเนินการชำระเงินได้")
             return redirect('orders:cart_summary')
 
-        # 2. ดึงข้อมูลเริ่มต้นสำหรับฟอร์ม (ตามที่ปรับปรุง)
+        # ดึงข้อมูลเริ่มต้นสำหรับฟอร์ม
         initial_data = self._get_initial_data(request)
         form = CheckoutForm(initial=initial_data) 
+        
+        # 2. คำนวณยอดรวมและส่วนลดจาก CartManager
+        subtotal = cart_manager.get_subtotal()
+        grand_total = cart_manager.get_grand_total()
         
         context = {
             'form': form,
             'cart': cart,
-            # ใช้ select_related เพื่อลด Query ในการเข้าถึง Product/Variant
-            'cart_items': cart.items.select_related('variant__product').all(), 
+            'cart_items': cart.items.select_related('variant__product').all(),
+            'subtotal': subtotal,                 # <--- ส่ง Subtotal เข้า Context
+            'grand_total': grand_total,           # <--- ส่ง Grand Total เข้า Context
+            'discount_amount': cart.discount_amount, # ส่งส่วนลดปัจจุบันเข้า Context
         }
         return render(request, self.template_name, context)
 
     def _create_order_items(self, new_order, cart_items):
-        """สร้าง OrderItem จาก CartItem ที่มีอยู่"""
+        """สร้าง OrderItem จาก CartItem ที่มีอยู่ (ใช้ bulk_create เพื่อเพิ่มประสิทธิภาพ)"""
         order_items = []
         for cart_item in cart_items:
             order_items.append(
@@ -286,7 +286,7 @@ class CheckoutView(View):
                     variant_size=cart_item.variant.size, 
                 )
             )
-        OrderItem.objects.bulk_create(order_items) # ใช้ bulk_create เพื่อเพิ่มประสิทธิภาพ
+        OrderItem.objects.bulk_create(order_items)
 
     def _update_promotion_usage(self, cart):
         """อัปเดตจำนวนครั้งที่ใช้โปรโมชั่น"""
@@ -297,7 +297,6 @@ class CheckoutView(View):
                 promotion.times_used += 1
                 promotion.save(update_fields=['times_used'])
             except Promotion.DoesNotExist:
-                # โปรโมชั่นอาจถูกลบออกไประหว่างการใช้งาน แต่เราจะปล่อยให้ผ่านไป
                 messages.warning(self.request, f"ไม่พบรหัสโปรโมชั่น '{cart.promotion_code}' แต่คำสั่งซื้อถูกสร้างแล้ว")
                 pass
 
@@ -313,33 +312,36 @@ class CheckoutView(View):
             
         form = CheckoutForm(request.POST)
 
+        # คำนวณยอดรวมและส่วนลดล่าสุดอีกครั้ง
+        subtotal = cart_manager.get_subtotal()
+        grand_total = cart_manager.get_grand_total()
+        
         if form.is_valid():
             data = form.cleaned_data
             
-            # 2. สร้าง Order หลัก
+            # 1. สร้าง Order
             new_order = Order.objects.create(
                 user=request.user if request.user.is_authenticated else None,
                 
-                # ข้อมูลการจัดส่งและการติดต่อ
                 full_name=data['full_name'],
                 email=data['email'],
                 phone_number=data['phone_number'],
                 shipping_address=data['shipping_address'],
                 payment_method=data['payment_method'],
                 
-                # สรุปทางการเงิน (ใช้ค่าจาก Cart โดยตรงและ Quantize)
-                total_amount=cart.total_subtotal.quantize(Decimal('0.00')),
+                # สรุปทางการเงิน (ใช้ค่าที่คำนวณล่าสุดจาก CartManager)
+                total_amount=subtotal.quantize(Decimal('0.00')),
                 discount_amount=cart.discount_amount.quantize(Decimal('0.00')),
-                grand_total=cart.grand_total.quantize(Decimal('0.00')),
+                grand_total=grand_total.quantize(Decimal('0.00')),
             )
             
-            # 3. สร้าง Order Items
+            # 2. สร้าง Order Items
             self._create_order_items(new_order, cart.items.all())
             
-            # 4. อัปเดต Promotion usage
+            # 3. อัปเดต Promotion usage
             self._update_promotion_usage(cart)
                 
-            # 5. ล้างตะกร้าสินค้า (Clear the cart)
+            # 4. ล้างตะกร้าสินค้า
             cart.items.all().delete() 
             cart.promotion_code = ""
             cart.discount_amount = Decimal('0.00')
@@ -353,6 +355,9 @@ class CheckoutView(View):
             'cart': cart,
             'form': form,
             'cart_items': cart.items.select_related('variant__product').all(),
+            'subtotal': subtotal,                 # <--- ส่ง Subtotal กลับไป
+            'grand_total': grand_total,           # <--- ส่ง Grand Total กลับไป
+            'discount_amount': cart.discount_amount, 
         }
         messages.error(request, "ข้อมูลการจัดส่งไม่สมบูรณ์ กรุณาตรวจสอบอีกครั้ง")
         return render(request, self.template_name, context)
@@ -373,3 +378,75 @@ class OrderDetailView(View):
         
         context = {'order': order}
         return render(request, self.template_name, context)
+@csrf_exempt # อนุญาตให้ POST request ภายนอกเข้าถึงได้ (ควรใช้ CSRF Token ใน JS เพื่อความปลอดภัย)
+@require_POST
+def validate_coupon(request):
+    """
+    ตรวจสอบโค้ดส่วนลดจากฐานข้อมูล และคำนวณมูลค่าส่วนลด
+    """
+    try:
+        # 1. รับและแปลงข้อมูลจาก JSON
+        data = json.loads(request.body)
+        coupon_code = data.get('coupon_code', '').upper()
+        # แปลง subtotal เป็น Decimal เพื่อหลีกเลี่ยงข้อผิดพลาดทางการเงิน
+        subtotal = Decimal(data.get('subtotal', 0))
+        
+    except (json.JSONDecodeError, InvalidOperation, TypeError):
+        return JsonResponse({'valid': False, 'message': 'รูปแบบข้อมูลไม่ถูกต้อง'}, status=400)
+    
+    # ถ้าไม่มีโค้ด ก็ให้จบการทำงาน
+    if not coupon_code:
+        return JsonResponse({'valid': False, 'message': 'กรุณาใส่โค้ดส่วนลด'})
+    
+    try:
+        # 2. ค้นหาโค้ดในฐานข้อมูล
+        # เราใช้ Promotion Model ของคุณ
+        promotion = Promotion.objects.get(code=coupon_code)
+        
+        # 3. ตรวจสอบเงื่อนไขตาม Model Properties และฟิลด์
+        
+        # 3.1 ตรวจสอบสถานะและวันที่ (ใช้ @property is_valid ที่คุณสร้าง)
+        if not promotion.is_valid:
+            # ใช้ property is_valid ที่อยู่ใน Model.py ของคุณ
+            return JsonResponse({
+                'valid': False, 
+                'message': 'โค้ดนี้ถูกปิดใช้งาน หรือหมดอายุ/ใช้ครบจำนวนแล้ว'
+            })
+            
+        # 3.2 ตรวจสอบยอดสั่งซื้อขั้นต่ำ
+        if subtotal < promotion.min_order_amount:
+             return JsonResponse({
+                'valid': False, 
+                'message': f'ยอดสั่งซื้อขั้นต่ำสำหรับโค้ดนี้คือ {promotion.min_order_amount.quantize(Decimal("0.01"))} บาท'
+             })
+        
+        # 4. คำนวณมูลค่าส่วนลด
+        
+        if promotion.discount_type == DiscountType.PERCENTAGE:
+            # คำนวณส่วนลดแบบเปอร์เซ็นต์
+            discount_amount = subtotal * (promotion.discount_value / Decimal(100))
+        elif promotion.discount_type == DiscountType.FIXED_AMOUNT:
+            # คำนวณส่วนลดแบบจำนวนเงินคงที่
+            discount_amount = promotion.discount_value
+        else:
+            discount_amount = Decimal(0)
+
+        # 5. ตรวจสอบให้แน่ใจว่าส่วนลดไม่เกินยอดรวมสินค้า
+        final_discount = min(discount_amount, subtotal)
+        final_discount = final_discount.quantize(Decimal("0.01"))
+        
+        # 6. ส่งผลลัพธ์กลับในรูปแบบ JSON
+        return JsonResponse({
+            'valid': True,
+            'discount_amount': final_discount,
+            'message': 'ใช้โค้ดส่วนลดสำเร็จ'
+        })
+        
+    except Promotion.DoesNotExist:
+        # ไม่พบโค้ดในฐานข้อมูล
+        return JsonResponse({'valid': False, 'message': 'ไม่พบโค้ดส่วนลดนี้'})
+    
+    except Exception as e:
+        # การจัดการข้อผิดพลาดทั่วไป
+        print(f"Error processing coupon: {e}")
+        return JsonResponse({'valid': False, 'message': 'เกิดข้อผิดพลาดภายในระบบ'}, status=500)

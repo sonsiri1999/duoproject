@@ -90,6 +90,21 @@ class CartItem(models.Model):
         """Calculates the subtotal for this specific item."""
         return self.quantity * self.price_at_addition
         
+    @property
+    def product_name(self):
+        """ดึงชื่อสินค้าหลักจาก variant"""
+        try:
+            return self.variant.product.name
+        except AttributeError:
+            return "(ไม่พบชื่อสินค้า)"
+
+    @property
+    def variant_name(self):
+        """ดึงชื่อตัวเลือก เช่น ขนาด/สี จาก variant"""
+        try:
+            return self.variant.size
+        except AttributeError:
+            return ""
 # --- END CART MODELS ---
 
 
@@ -144,9 +159,21 @@ class Order(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("ผู้สั่งซื้อ"))
     status = models.CharField(max_length=10, choices=OrderStatus.choices, default=OrderStatus.PENDING, verbose_name=_("สถานะคำสั่งซื้อ"))
 
-    total_amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name=_("ยอดรวมสินค้า (ก่อนส่วนลด)"))
+    total_amount = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        null=True,         
+        blank=True,        
+        verbose_name=_("ยอดรวมสินค้า (ก่อนส่วนลด)")
+    )
     discount_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, verbose_name=_("มูลค่าส่วนลด"))
-    grand_total = models.DecimalField(max_digits=10, decimal_places=2, verbose_name=_("ยอดชำระสุทธิ"))
+    grand_total = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        null=True,         # อนุญาตให้เป็น NULL ในฐานข้อมูล
+        blank=True,        # อนุญาตให้ว่างในฟอร์ม Django
+        verbose_name=_("ยอดชำระสุทธิ")
+    )
     
     full_name = models.CharField(max_length=255, verbose_name=_("ชื่อ-นามสกุล ผู้รับ"))
     email = models.EmailField(max_length=255, verbose_name=_("อีเมลติดต่อ"))
@@ -154,7 +181,12 @@ class Order(models.Model):
     shipping_address = models.TextField(verbose_name=_("ที่อยู่จัดส่ง"))
     
     payment_method = models.CharField(max_length=10, choices=PaymentMethod.choices, default=PaymentMethod.BANK, verbose_name=_("ช่องทางการชำระเงิน"))
-    
+    payment_slip = models.FileField(
+        upload_to='payment_slips/%Y/%m/%d/', 
+        null=True, 
+        blank=True, 
+        verbose_name='สลิปหลักฐานการโอนเงิน'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

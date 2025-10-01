@@ -31,7 +31,8 @@ LOGIN_REDIRECT_URL = 'products:product_list'
 
 # URL ที่ผู้ใช้จะถูกส่งไปเมื่อต้องการเข้าสู่ระบบ (ถ้าไม่ได้ระบุ)
 LOGIN_URL = 'users:login' 
-
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 ALLOWED_HOSTS = []
 
 AUTH_USER_MODEL = 'users.CustomUser'

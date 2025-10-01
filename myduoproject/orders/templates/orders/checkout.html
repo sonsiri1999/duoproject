@@ -1,3 +1,4 @@
+<!-- checkout.html -->
 {% load static %}
 <!DOCTYPE html>
 <html lang="th">
@@ -28,6 +29,21 @@
             font-family: 'Inter', sans-serif;
             background-color: #f3f4f6;
         }
+        /* Style for required file field visibility */
+        .file-upload-section {
+            transition: all 0.3s ease-in-out;
+            max-height: 0;
+            overflow: hidden;
+            opacity: 0;
+            padding-top: 0;
+            padding-bottom: 0;
+        }
+        .file-upload-section.active {
+            max-height: 200px; /* Sufficient height for content */
+            opacity: 1;
+            padding-top: 1rem;
+            padding-bottom: 1rem;
+        }
     </style>
 </head>
 <body class="min-h-screen">
@@ -37,14 +53,11 @@
         <div class="container mx-auto px-4 py-3 flex justify-between items-center">
             <h1 class="text-xl font-bold text-primary-blue">Pre-order DUO</h1>
             <nav class="space-x-4 text-sm hidden sm:block">
-                <!-- แก้ไข: 'products:list' เป็น 'products:product_list' (ตาม products/urls.py) -->
                 <a href="{% url 'products:product_list' %}" class="text-gray-600 hover:text-primary-blue">สินค้า</a>
-                <!-- แก้ไข: 'orders:detail' เป็น 'orders:cart' (ตาม orders/urls.py) -->
                 <a href="{% url 'orders:cart' %}" class="text-primary-blue font-semibold border-b-2 border-primary-blue pb-1">ตะกร้าสินค้า</a>
             </nav>
             <div class="flex items-center space-x-4">
                 <span class="text-gray-600 text-sm">สวัสดี, admin</span>
-                <!-- ใช้ 'logout' ซึ่งเป็น Global URL Name (ตาม project urls.py) -->
                 <button 
                     onclick="window.location.href='{% url 'logout' %}'" 
                     class="bg-primary-blue hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150">
@@ -58,8 +71,8 @@
         <h2 class="text-2xl md:text-3xl font-bold text-gray-800 mb-6 border-b pb-2">ขั้นตอนที่ 1: ข้อมูลจัดส่งและชำระเงิน</h2>
         
         <!-- START: Main Form for Checkout Submission -->
-        <!-- แก้ไข: 'orders:process_checkout' เป็น 'orders:checkout' (ตาม orders/urls.py) -->
-        <form method="POST" action="{% url 'orders:checkout' %}">
+        <!-- *** สำคัญ: เพิ่ม enctype="multipart/form-data" เพื่อรองรับการอัปโหลดไฟล์ *** -->
+        <form method="POST" action="{% url 'orders:checkout' %}" enctype="multipart/form-data">
             {% csrf_token %}
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -84,24 +97,53 @@
                             <label for="address" class="block text-sm font-medium text-gray-700 mb-1">ที่อยู่จัดส่ง *</label>
                             <textarea id="address" name="shipping_address" rows="3" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-primary-blue focus:border-primary-blue" required></textarea>
                         </div>
+                        
+                        <!-- เพิ่ม Email Field ที่ขาดไปในโค้ดเดิม (จำเป็นสำหรับ Order Model) -->
+                        <div class="mb-6">
+                            <label for="email" class="block text-sm font-medium text-gray-700 mb-1">อีเมลติดต่อ *</label>
+                            <input type="email" id="email" name="email" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-primary-blue focus:border-primary-blue" required>
+                        </div>
 
                         <h3 class="text-xl font-semibold text-gray-700 mb-4 border-t pt-4">ช่องทางการชำระเงิน *</h3>
                         
                         <!-- Payment Options (Radio Buttons) -->
-                        <div class="space-y-3">
+                        <div class="space-y-3" id="payment-options">
                             <div class="flex items-center">
-                                <input id="transfer" name="payment_method" value="transfer" type="radio" checked class="h-4 w-4 text-primary-blue border-gray-300 focus:ring-primary-blue">
+                                <!-- ค่า value="BANK" ให้ตรงกับ PaymentMethod.BANK ใน Django Model -->
+                                <input id="transfer" name="payment_method" value="BANK" type="radio" checked class="h-4 w-4 text-primary-blue border-gray-300 focus:ring-primary-blue">
                                 <label for="transfer" class="ml-3 block text-base font-medium text-gray-700">โอนเงินผ่านธนาคาร</label>
                             </div>
                             <div class="flex items-center">
-                                <input id="credit_card" name="payment_method" value="credit_card" type="radio" disabled class="h-4 w-4 text-primary-blue border-gray-300 focus:ring-primary-blue opacity-50 cursor-not-allowed">
+                                <!-- ค่า value="CC" ให้ตรงกับ PaymentMethod.CREDIT_CARD ใน Django Model -->
+                                <input id="credit_card" name="payment_method" value="CC" type="radio" disabled class="h-4 w-4 text-primary-blue border-gray-300 focus:ring-primary-blue opacity-50 cursor-not-allowed">
                                 <label for="credit_card" class="ml-3 block text-base font-medium text-gray-700 opacity-50">บัตรเครดิต/เดบิต (ยังไม่พร้อมใช้งาน)</label>
                             </div>
+                            <div class="flex items-center">
+                                <!-- ค่า value="COD" ให้ตรงกับ PaymentMethod.COD ใน Django Model -->
+                                <input id="cod" name="payment_method" value="COD" type="radio" class="h-4 w-4 text-primary-blue border-gray-300 focus:ring-primary-blue">
+                                <label for="cod" class="ml-3 block text-base font-medium text-gray-700">เก็บเงินปลายทาง (COD)</label>
+                            </div>
                         </div>
+
+                        <!-- *** ส่วนอัปโหลดสลิปที่เพิ่มเข้ามา *** -->
+                        <div id="payment-slip-upload" class="file-upload-section active bg-gray-50 border border-dashed border-gray-300 rounded-lg mt-4 p-4">
+                            <p class="text-sm font-medium text-gray-700 mb-2">อัปโหลดสลิปหลักฐานการโอนเงิน *</p>
+                            <input 
+                                type="file" 
+                                id="payment_slip_file" 
+                                name="payment_slip" 
+                                accept="image/*" 
+                                class="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-white focus:outline-none"
+                                required
+                            >
+                            <p class="mt-1 text-xs text-gray-500">รองรับไฟล์ JPG, PNG หรือ PDF (ไม่เกิน 5MB)</p>
+                        </div>
+                        <!-- ************************************ -->
+
                     </div>
                 </div>
 
-                <!-- Right Side: Order Summary -->
+                <!-- Right Side: Order Summary (unchanged) -->
                 <div class="lg:col-span-1 bg-white p-6 rounded-xl shadow-lg">
                     <h3 class="text-xl font-semibold text-gray-700 mb-4 border-b pb-3">สรุปคำสั่งซื้อ</h3>
 
@@ -109,8 +151,11 @@
                     <div class="space-y-2 mb-4 text-sm" id="cart-items-container">
                         {% for item in cart_items %}
                         <div class="flex justify-between">
-                            <p class="text-gray-600">{{ item.quantity }} x {{ item.product.name }} ({% if item.variant_display %}{{ item.variant_display }}{% else %}{{ item.product.variant_name }}{% endif %})</p>
-                            <p class="font-medium">{{ item.line_total|floatformat:2 }} บาท</p>
+                            <p class="text-gray-600">
+                                {{ item.quantity }} x {{ item.product_name }}
+                                {% if item.variant_name %} ({{ item.variant_name }}){% endif %}
+                            </p>
+                            <p class="font-medium">{{ item.subtotal|floatformat:2 }} บาท</p>
                         </div>
                         {% empty %}
                         <div class="text-center py-4 text-gray-500">
@@ -121,11 +166,10 @@
                     </div>
                     <!-- End Product List -->
 
-                    <!-- Discount Code Input Section -->
+                    <!-- Discount Code Input Section (unchanged) -->
                     <div class="border-t pt-4 mt-4">
                         <label for="coupon-code" class="block text-sm font-semibold text-gray-700 mb-2">โค้ดส่วนลด (ถ้ามี)</label>
                         <div class="flex space-x-2">
-                            <!-- Hidden input to store applied discount code for form submission -->
                             <input type="hidden" name="applied_coupon_code" id="applied-coupon-code-hidden" value="">
                             
                             <input type="text" id="coupon-code" placeholder="เช่น GEMINI10" class="flex-grow p-2 border border-gray-300 rounded-lg text-sm focus:ring-primary-blue focus:border-primary-blue uppercase">
@@ -137,9 +181,8 @@
                     </div>
                     <!-- END Discount Code Input Section -->
                     
-                    <!-- Price Totals -->
+                    <!-- Price Totals (unchanged) -->
                     <div class="border-t pt-4 mt-4 space-y-2">
-                        <!-- Hidden input fields to send final calculated totals to Django -->
                         <input type="hidden" name="final_subtotal" id="final-subtotal-hidden" value="{{ subtotal|floatformat:2 }}">
                         <input type="hidden" name="final_discount" id="final-discount-hidden" value="0.00">
                         <input type="hidden" name="final_grand_total" id="final-grand-total-hidden" value="{{ subtotal|floatformat:2 }}">
@@ -171,7 +214,7 @@
 
     <script>
         // --- JAVASCRIPT LOGIC FOR DISCOUNT CALCULATION ---
-
+        
         // START: Dynamically set subtotal from Django context
         let subtotal = parseFloat('{{ subtotal|floatformat:2 }}');
         // Fallback for safety in case context variable is missing or cart is empty
@@ -262,24 +305,54 @@
             calculateTotal();
         }
 
+        /**
+         * จัดการการแสดง/ซ่อนฟิลด์อัปโหลดสลิป
+         * และตั้งค่า required attribute ตามวิธีการชำระเงินที่เลือก
+         */
+        function handlePaymentMethodChange() {
+            const transferRadio = document.getElementById('transfer');
+            const slipUploadSection = document.getElementById('payment-slip-upload');
+            const slipInput = document.getElementById('payment_slip_file');
+            
+            // 'BANK' (โอนเงินผ่านธนาคาร) คือวิธีการเดียวที่ต้องใช้สลิป
+            const needsSlip = transferRadio.checked; 
+
+            if (needsSlip) {
+                slipUploadSection.classList.add('active');
+                slipInput.required = true;
+            } else {
+                slipUploadSection.classList.remove('active');
+                slipInput.required = false;
+                // ล้างค่าเมื่อซ่อน เพื่อป้องกันการส่งไฟล์ที่ไม่ต้องการ
+                slipInput.value = ''; 
+            }
+        }
+
         // Initialize on page load
         window.onload = function() {
             // Initial total calculation display (using dynamic subtotal)
             calculateTotal();
             
-            // Attach event listener to the "Apply" button
+            // --- Coupon Listeners (unchanged) ---
             document.getElementById('apply-coupon-btn').addEventListener('click', function(e) {
-                e.preventDefault(); // Prevent form submission (since this button is type="button")
+                e.preventDefault(); 
                 applyDiscount();
             });
-
-            // Allow pressing Enter key in the input field
             document.getElementById('coupon-code').addEventListener('keypress', function(e) {
                 if (e.key === 'Enter') {
                     e.preventDefault();
                     applyDiscount();
                 }
             });
+            
+            // --- Payment Method Listener (NEW) ---
+            const paymentOptions = document.getElementById('payment-options');
+            if (paymentOptions) {
+                paymentOptions.addEventListener('change', handlePaymentMethodChange);
+            }
+
+            // เรียกใช้ครั้งแรกเพื่อตั้งค่าสถานะเริ่มต้น
+            handlePaymentMethodChange(); 
         }
     </script>
 </body>

@@ -16,6 +16,7 @@ urlpatterns = [
     
     # Promotions
     path('promotion/apply/', views.apply_promotion, name='apply_promotion'),
+    path('validate-coupon/', views.validate_coupon, name='validate_coupon'),
     
     # Checkout and Order Detail
     path('checkout/', views.CheckoutView.as_view(), name='checkout'),

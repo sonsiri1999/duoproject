@@ -1,8 +1,8 @@
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import Sum, F, DecimalField # เพิ่ม F และ DecimalField
 from django.http import HttpRequest
 from decimal import Decimal
-from django.apps import apps # <-- Import ตัวนี้เข้ามา
+from django.apps import apps 
 
 # นำเข้าโมเดล Cart และ CartItem จากไฟล์ orders.models ปัจจุบัน
 from .models import Cart, CartItem 
@@ -10,11 +10,9 @@ from .models import Cart, CartItem
 # -------------------------------------------------------------------
 # FIX: การ Import ProductVariant อย่างถูกต้อง
 # -------------------------------------------------------------------
-# ใช้ apps.get_model เพื่อหลีกเลี่ยง Circular Import และปัญหา Model Loading
 try:
     ProductVariant = apps.get_model('products', 'ProductVariant')
 except LookupError:
-    # กรณีที่ไม่สามารถหาโมเดลได้ (เช่น ถ้า app 'products' ยังไม่ถูกโหลด)
     print("FATAL ERROR: Could not find ProductVariant model in the 'products' application.")
     raise
 
@@ -38,7 +36,7 @@ class CartManager:
             self.request.session.create()
         self.session_key = self.request.session.session_key
 
-        # 2. หาหรือสร้าง Cart (ปรับปรุง Logic การรวม Cart)
+        # 2. หาหรือสร้าง Cart 
         self.cart = self._get_or_create_cart()
 
     def _get_or_create_cart(self) -> Cart:
@@ -54,18 +52,20 @@ class CartManager:
                 session_cart.session_key = None
                 session_cart.save()
                 return session_cart
-            elif user_cart and user_cart.session_key and user_cart.session_key != self.session_key:
-                 # ถ้า User มี Cart แต่ผูกกับ Session ID อื่น (อาจเกิดจากการรวม) ให้ทำการ Merge
-                self._merge_session_cart(user_cart, user_cart.session_key)
+            elif user_cart and session_cart and user_cart.id != session_cart.id: # ตรวจสอบ ID เพื่อป้องกันการผสานตัวเอง
+                # ถ้า User มี Cart แล้ว และมี Guest Cart ที่ยังไม่ถูกผสาน
+                self._merge_session_cart(user_cart, session_cart)
+                return user_cart
             elif not user_cart:
                 # ถ้าไม่มี Cart ทั้งแบบ User และ Session -> สร้างใหม่
                 return Cart.objects.create(user=self.user)
             
-            # 2b. ถ้ามี Cart ของ User อยู่แล้ว (และอาจจะถูกจัดการ session_key ไปแล้ว)
+            # 2b. ถ้ามี Cart ของ User อยู่แล้ว
             if user_cart and user_cart.session_key:
-                # ตรวจสอบอีกครั้งเพื่อความแน่ใจ
+                # ล้าง session_key หากมีการล็อกอิน
                 user_cart.session_key = None
                 user_cart.save(update_fields=['session_key'])
+
             return user_cart
 
         else:
@@ -74,35 +74,31 @@ class CartManager:
             return cart
 
     @transaction.atomic
-    def _merge_session_cart(self, user_cart: Cart, session_key_to_merge: str):
+    def _merge_session_cart(self, user_cart: Cart, guest_cart: Cart):
         """รวมรายการสินค้าจาก Cart ของ Guest เข้าสู่ Cart ของ User"""
-        try:
-            # ใช้ Cart.objects.filter เพื่อดึง Cart ที่ตรงกับ session key เท่านั้น
-            guest_cart = Cart.objects.get(session_key=session_key_to_merge, user__isnull=True)
-            
-            # ย้ายรายการสินค้าทั้งหมดจาก Guest Cart ไป User Cart
-            for guest_item in guest_cart.items.all():
-                # เรียกใช้เมธอด add เพื่อให้มีการตรวจสอบและรวม item ที่ซ้ำกัน
-                self.add(
-                    variant=guest_item.variant, 
-                    quantity=guest_item.quantity, 
-                    price_override=guest_item.price_at_addition 
-                )
-            
-            # ลบ Guest Cart เดิม
-            guest_cart.delete()
-            
-        except Cart.DoesNotExist:
-            pass
         
+        # ย้ายรายการสินค้าทั้งหมดจาก Guest Cart ไป User Cart
+        for guest_item in guest_cart.items.all():
+            # เรียกใช้เมธอด add เพื่อให้มีการตรวจสอบและรวม item ที่ซ้ำกัน
+            # NOTE: ต้องตั้งค่า self.cart ให้เป็น user_cart ชั่วคราวเพื่อให้ self.add ทำงานกับ user_cart
+            original_cart = self.cart
+            self.cart = user_cart
+            self.add(
+                variant=guest_item.variant, 
+                quantity=guest_item.quantity, 
+                price_override=guest_item.price_at_addition 
+            )
+            self.cart = original_cart # คืนค่า self.cart เดิม
+        
+        # ลบ Guest Cart เดิม
+        guest_cart.delete()
+
     @transaction.atomic
     def add(self, variant, quantity: int = 1, price_override: Decimal = None):
         """
         เมธอดหลักในการเพิ่ม ProductVariant ลงใน Cart หรืออัปเดตจำนวน
-        ใช้ try/except เพื่อหลีกเลี่ยงปัญหา ValueError ที่เคยเกิดขึ้น
         """
         # 1. ตรวจสอบราคาที่จะใช้
-        # ต้องมั่นใจว่า ProductVariant มี 'current_price' field
         try:
             unit_price = price_override if price_override is not None else variant.current_price
         except AttributeError:
@@ -112,7 +108,7 @@ class CartManager:
             # 2. ลองค้นหารายการสินค้าในตะกร้าที่มีอยู่แล้ว (ส่วน Get/Update)
             cart_item = CartItem.objects.get(
                 cart=self.cart,
-                variant_id=variant.id, # ค้นหาโดยใช้ ID เพื่อประสิทธิภาพและความแม่นยำ
+                variant_id=variant.id, 
             )
             
             # 3. ถ้ารายการสินค้ามีอยู่: อัปเดตจำนวนและราคา
@@ -124,7 +120,7 @@ class CartManager:
             # 4. ถ้ารายการสินค้าไม่มีอยู่: สร้างรายการใหม่ (ส่วน Create)
             cart_item = CartItem.objects.create(
                 cart=self.cart,
-                variant=variant, # ใช้ object ที่ดึงมาจาก views.py (ซึ่งตอนนี้ ORM ควรจะรู้จักแล้ว)
+                variant=variant, 
                 quantity=quantity,
                 price_at_addition=unit_price
             )
@@ -134,8 +130,26 @@ class CartManager:
 
     def get_total_quantity(self) -> int:
         """นับจำนวนรวมของชิ้นสินค้าทั้งหมดในตะกร้า"""
-        # ใช้ aggregation เพื่อประสิทธิภาพที่ดีกว่า
         result = self.cart.items.aggregate(total_quantity=Sum('quantity'))
         return result['total_quantity'] or 0
-    
-    # ... (เมธอดอื่นๆ)
+
+    # ***************************************************************
+    # FIX: เพิ่มเมธอดสำหรับคำนวณยอดรวม (Subtotal) และยอดสุทธิ (Grand Total)
+    # ***************************************************************
+    def get_subtotal(self) -> Decimal:
+        """คำนวณยอดรวมสินค้าทั้งหมดในตะกร้า (ก่อนส่วนลด)"""
+        # คำนวณยอดรวมของ (quantity * price_at_addition)
+        subtotal = self.cart.items.aggregate(
+            subtotal=Sum(F('quantity') * F('price_at_addition'), output_field=DecimalField())
+        )['subtotal']
+        
+        return subtotal.quantize(Decimal('0.00')) if subtotal else Decimal('0.00')
+
+    def get_grand_total(self) -> Decimal:
+        """คำนวณยอดรวมสุทธิ (หลังส่วนลด)"""
+        subtotal = self.get_subtotal()
+        discount = self.cart.discount_amount if self.cart.discount_amount else Decimal('0.00')
+        
+        grand_total = subtotal - discount
+        # ป้องกันไม่ให้ราคารวมติดลบ
+        return max(Decimal('0.00'), grand_total).quantize(Decimal('0.00'))

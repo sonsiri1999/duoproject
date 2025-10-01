@@ -1,17 +1,23 @@
-Python / Django specific ignores
-pycache/
+# Python
+__pycache__/
 *.pyc
-*.log
-.DS_Store
-.env
-venv/
+*.pyo
+*.pyd
+*.egg-info/
+.Python
 env/
+venv/
+pip-wheel-metadata/
+dist/
+build/
 
-Django specific
-*.sqlite3
-db.sqlite3
-/media/
+# Django specific
+*.log
+*.sqlite3 # ไฟล์ฐานข้อมูล SQLite
+/media/ # โฟลเดอร์ที่เก็บไฟล์ที่ผู้ใช้อัปโหลด
+/static/ # โฟลเดอร์ที่รวบรวมไฟล์ static (ถ้ามีการรวบรวม)
 
-IDE specific (VSCode, PyCharm)
-.vscode/
-.idea/
+# Secrets
+# สิ่งที่สำคัญที่สุด: คีย์ลับและรหัสผ่าน
+settings_local.py
+*.env

@@ -24,7 +24,7 @@ urlpatterns = [
     # กำหนด prefix เป็น 'users/' หรือจะใช้ 'accounts/' ก็ได้ แต่เลือก 'users/' เพื่อความชัดเจน
     # ใช้ namespace 'users' (เช่น users:profile)
     path('users/', include('users.urls', namespace='users')), 
-]
+]  + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 # การตั้งค่า Static และ Media (ต้องมีเฉพาะใน settings.DEBUG เท่านั้น)
 if settings.DEBUG:
