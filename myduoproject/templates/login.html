@@ -1,0 +1,63 @@
+<!--
+    นี่คือไฟล์ Template สำหรับหน้า Login แบบง่ายๆ
+    โดยใช้ Tailwind CSS เพื่อให้ดูสวยงามและตอบสนองได้ดี
+-->
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>เข้าสู่ระบบ</title>
+    <!-- โหลด Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- ตั้งค่า Font Inter -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* สีเทาอ่อน */
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+    <div class="w-full max-w-md bg-white p-8 rounded-xl shadow-2xl border border-gray-100">
+        <!-- Header -->
+        <h1 class="text-3xl font-extrabold text-gray-800 mb-2 text-center">
+            My Duo Login
+        </h1>
+        <p class="text-center text-gray-500 mb-8">
+            เข้าสู่ระบบเพื่อดำเนินการต่อ
+        </p>
+
+        <!-- Social Login Button -->
+        <div class="space-y-4">
+            <!-- 
+                ปุ่มนี้จะลิงก์ไปยัง URL ของ django-allauth สำหรับการล็อกอินด้วย Google
+                URL นี้ถูกกำหนดโดย allauth: '/accounts/google/login/' 
+                
+                next=/ คือการระบุว่าเมื่อล็อกอินสำเร็จ ให้กลับไปที่หน้าแรก (/)
+            -->
+            <a href="{% url 'google_login' %}?next=/" 
+               class="w-full flex items-center justify-center bg-white text-gray-700 py-3 px-4 border border-gray-300 rounded-lg shadow-sm 
+                      hover:bg-gray-50 transition duration-150 ease-in-out font-semibold text-lg"
+               role="button">
+                
+                <!-- Google Icon SVG (ขนาด 24x24) -->
+                <svg class="w-6 h-6 mr-3" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8 0-.47.05-.93.13-1.38h3.9c.14.47.22.96.22 1.45 0 .23-.01.46-.04.68H12v2.5h-2.16c.38 1.46 1.43 2.51 2.76 2.91v.01l.01.01c.21.05.42.08.64.08 1.8 0 3.32-.93 4.18-2.3H12v-2.5h8.92c.11.75.18 1.5.18 2.27 0 4.18-3.35 7.6-7.5 7.6zM12 6.5c1.4 0 2.5 1.1 2.5 2.5s-1.1 2.5-2.5 2.5S9.5 10.4 9.5 9s1.1-2.5 2.5-2.5z"/>
+                </svg>
+                
+                เข้าสู่ระบบด้วย Google
+            </a>
+            
+            <!-- เพิ่มปุ่มอื่น ๆ หรือส่วน Form Login ได้ที่นี่ (ถ้ามี) -->
+        </div>
+        
+        <!-- Footer / Legal -->
+        <p class="mt-8 text-xs text-center text-gray-400">
+            การเข้าสู่ระบบแสดงว่าคุณยอมรับเงื่อนไขการให้บริการของเรา
+        </p>
+
+    </div>
+</body>
+</html>

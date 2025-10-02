@@ -5,11 +5,12 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.contrib.auth.decorators import user_passes_test
 from django.contrib import messages
-from decimal import Decimal # ต้อง import Decimal เพื่อให้แน่ใจว่าใช้ในการคำนวณ
+from decimal import Decimal 
+from django.db.models import Prefetch, Min # Import Prefetch and Min
 
 from .models import Product, ProductVariant
 from .forms import ProductCreateForm 
-from orders.utils import get_cart_session # ดึงฟังก์ชันจัดการ Session Cart
+from orders.utils import get_cart_session 
 
 # Test function for staff access
 def is_staff(user):
@@ -27,8 +28,31 @@ class ProductListView(ListView):
     paginate_by = 12
     
     def get_queryset(self):
-        """กรองสินค้าตามสถานะ: Pre-order หรือ Available"""
-        return Product.objects.filter(status__in=['PRE_ORDER', 'AVAILABLE']).order_by('-created_at')
+        """
+        กรองสินค้าตามสถานะและดึงข้อมูล ProductVariant ที่มีราคาต่ำสุด 
+        มาด้วยใน Query เดียวเพื่อแก้ปัญหา N+1 Query
+        """
+        # 1. กำหนด Prefetch Object เพื่อดึงเฉพาะ ProductVariant ที่เป็น default หรือมีราคาต่ำสุด
+        # เนื่องจากใน Template คุณใช้ .first เราจะดึง Variant ทั้งหมดและให้ Django จัดการในหน่วยความจำ
+        # แต่เพื่อประสิทธิภาพสูงสุด เราควรดึงเฉพาะ variant ที่ต้องการจริงๆ (เช่น variant ที่มี is_default=True)
+        
+        # สำหรับกรณีที่คุณต้องการใช้ .first() ใน Template ต่อไป (เพื่อดึง Variant แรกที่พบ)
+        # Prefetch('variants') ก็เพียงพอที่จะแก้ปัญหา N+1
+        # หรือถ้าต้องการดึงเฉพาะ variant ที่เป็น default:
+        default_variant_prefetch = Prefetch(
+            'variants',
+            queryset=ProductVariant.objects.filter(is_default=True).order_by('id'), # สั่งให้ดึงเฉพาะ default variant (ถ้ามี)
+            to_attr='default_variant_list' # เก็บผลลัพธ์ไว้ใน attribute ชื่อ 'default_variant_list'
+        )
+        
+        queryset = Product.objects.filter(
+            status__in=['PRE_ORDER', 'AVAILABLE']
+        ).prefetch_related(
+            default_variant_prefetch
+        ).order_by('-created_at')
+
+        return queryset
+
 
 class ProductDetailView(DetailView):
     model = Product

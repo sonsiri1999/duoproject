@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% load i18n %}
+{% load socialaccount %}
+
+{% block title %}
+เข้าสู่ระบบด้วยบัญชีโซเชียล
+{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-center min-h-screen bg-gray-100 p-4">
+    <div class="w-full max-w-md bg-white p-8 rounded-2xl shadow-2xl transition duration-500 hover:shadow-3xl">
+        
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-extrabold text-indigo-700 mb-2">
+                {% trans "ลงชื่อเข้าใช้" %}
+            </h1>
+            <p class="text-gray-500">
+                {% blocktrans with provider_name=account.get_provider.name %}คุณกำลังจะเข้าสู่ระบบด้วยบัญชี: {{ provider_name }}{% endblocktrans %}
+            </p>
+        </div>
+
+        <div class="border border-indigo-200 bg-indigo-50 p-6 rounded-xl space-y-4">
+            <!-- ข้อมูลบัญชีที่ผู้ใช้จะใช้ -->
+            <div class="flex items-center space-x-4">
+                <div class="flex-shrink-0">
+                    <!-- Icon/Avatar Placeholder (สามารถแทนที่ด้วยรูปโปรไฟล์จริงได้หากมี) -->
+                    <svg class="h-10 w-10 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-xl font-semibold text-gray-800">
+                        <!-- หากมีอีเมลใน account data จะแสดงอีเมล -->
+                        {% if account.user.email %}
+                            {{ account.user.email }}
+                        {% else %}
+                            (ไม่พบอีเมล)
+                        {% endif %}
+                    </p>
+                    <p class="text-sm text-indigo-600">
+                        ผ่าน: {{ account.get_provider.name }}
+                    </p>
+                </div>
+            </div>
+
+            <p class="text-sm text-gray-700 pt-4">
+                การดำเนินการนี้จะสร้างหรือเชื่อมโยงบัญชีของคุณเข้ากับเว็บไซต์ <strong>Pre-order DUO</strong>
+            </p>
+        </div>
+
+        <!-- ฟอร์มยืนยัน -->
+        <form method="post" class="mt-8 space-y-4">
+            {% csrf_token %}
+            
+            <button type="submit" 
+                    class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-md text-lg font-bold text-white bg-green-500 hover:bg-green-600 focus:outline-none focus:ring-4 focus:ring-green-300 transition duration-150 transform hover:scale-[1.01]">
+                ดำเนินการต่อ (Continue)
+            </button>
+        </form>
+        
+        <!-- ลิงก์ยกเลิก -->
+        <div class="mt-4 text-center">
+            <a href="{% url 'users:login' %}" 
+               class="text-sm font-medium text-gray-500 hover:text-gray-900">
+                ยกเลิกและกลับไปหน้าเข้าสู่ระบบปกติ
+            </a>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

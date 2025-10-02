@@ -27,8 +27,10 @@ SECRET_KEY = 'django-insecure-iul3si@&b-45fxc4k(fq-&ydhilk%mye2gj3=lb_wz8bppy%l3
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-LOGIN_REDIRECT_URL = 'products:product_list' 
+LOGIN_REDIRECT_URL = '/' 
 
+# *** (ตัวเลือกเสริม) ตั้งค่าปลายทางหลังจากการ Logout สำเร็จ ***
+ACCOUNT_LOGOUT_REDIRECT_URL = '/' 
 # URL ที่ผู้ใช้จะถูกส่งไปเมื่อต้องการเข้าสู่ระบบ (ถ้าไม่ได้ระบุ)
 LOGIN_URL = 'users:login' 
 MEDIA_URL = '/media/'
@@ -50,7 +52,37 @@ INSTALLED_APPS = [
     'promotions',
     'orders',
     'django.contrib.humanize',
+    # Required for allauth
+    'django.contrib.sites',  # ต้องมี
+    
+    # Third-party Apps
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    
+    # *** เพิ่ม Provider ของ Google ***
+    'allauth.socialaccount.providers.google',
+    'widget_tweaks',
 ]
+
+SITE_ID = 1 
+
+# การตั้งค่า Allauth
+AUTHENTICATION_BACKENDS = (
+    # Required for the admin
+    'django.contrib.auth.backends.ModelBackend',
+
+    # allauth specific authentication methods, such as login by e-mail
+    'allauth.account.auth_backends.AuthenticationBackend',
+)
+
+# ตัวเลือกอื่นๆ (แนะนำ)
+ACCOUNT_AUTHENTICATION_METHOD = "username_email" # อนุญาตให้ Login ด้วย username หรือ email
+ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_USERNAME_REQUIRED = False
+ACCOUNT_SIGNUP_EMAIL_ENTER_TWICE = False
+ACCOUNT_SESSION_REMEMBER = True
+ACCOUNT_UNIQUE_EMAIL = True
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -60,6 +92,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'allauth.account.middleware.AccountMiddleware',
 ]
 
 ROOT_URLCONF = 'myduoproject.urls'

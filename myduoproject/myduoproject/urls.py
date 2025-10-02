@@ -3,27 +3,27 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib.auth import views as auth_views 
+from django.views.generic.base import TemplateView
+
+from products.views import ProductListView
 
 urlpatterns = [
     # 1. Django Admin (ระบบผู้ดูแล)
     path('admin/', admin.site.urls),
+    path('', ProductListView.as_view(), name='home'),
     
     # 2. Authentication: Logout (ใช้ชื่อ 'logout' ตรงตามที่ template ต้องการ)
     # เมื่อผู้ใช้ออกจากระบบ จะนำทางไปยังหน้าแรก ('/')
     path('accounts/logout/', auth_views.LogoutView.as_view(next_page='/'), name='logout'),
-    
-    # 3. Main App: Products (หน้าหลัก/รายการสินค้า)
-    # กำหนดให้เป็น root URL ('') และใช้ namespace 'products' (เช่น products:product_list)
+    path('accounts/', include('allauth.urls')),
+    path('', ProductListView.as_view(), name='home'),
+    path('login/', TemplateView.as_view(template_name='login.html'), name='login'),
     path('', include('products.urls', namespace='products')), 
     
-    # 4. App: Orders (ตะกร้าสินค้า/ชำระเงิน/รายการสั่งซื้อ)
-    # กำหนด prefix เป็น 'orders/' และใช้ namespace 'orders' (เช่น orders:cart)
     path('orders/', include('orders.urls', namespace='orders')), 
-    
-    # 5. App: Users (หน้าโปรไฟล์/จัดการบัญชี)
-    # กำหนด prefix เป็น 'users/' หรือจะใช้ 'accounts/' ก็ได้ แต่เลือก 'users/' เพื่อความชัดเจน
-    # ใช้ namespace 'users' (เช่น users:profile)
+    # path('', TemplateView.as_view(template_name='base.html'), name='home'),
     path('users/', include('users.urls', namespace='users')), 
+    
 ]  + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 # การตั้งค่า Static และ Media (ต้องมีเฉพาะใน settings.DEBUG เท่านั้น)

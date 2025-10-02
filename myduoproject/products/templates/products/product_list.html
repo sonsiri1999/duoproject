@@ -1,49 +1,94 @@
 {% extends "base.html" %}
+{% load static %}
 
-{% block title %}รายการสินค้า Pre-order{% endblock %}
+{% block title %}รายการสินค้า Pre-order DUO{% endblock %}
 
 {% block content %}
-<div class="bg-white p-6 rounded-lg shadow-xl">
-    <h1 class="text-3xl font-extrabold text-gray-900 mb-6 border-b pb-2">สินค้าสำหรับ Pre-order</h1>
-
-    {% if products %}
+    <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <h1 class="text-3xl font-extrabold text-gray-900 mb-8 text-center">สินค้าทั้งหมดสำหรับการ Pre-order</h1>
+        
+        <!-- Grid สำหรับแสดงรายการสินค้า -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-            {% for product in products %}
-            <div class="border border-gray-200 rounded-lg overflow-hidden transition duration-300 hover:shadow-lg">
-                
-                <div class="bg-gray-100 h-48 flex items-center justify-center">
-                    {% if product.image %}
-                        <img 
-                            src="{{ product.image.url }}" 
-                            alt="{{ product.name }}" 
-                            class="w-full h-full object-cover transition duration-300 hover:scale-105" 
-                        >
-                    {% else %}
-                        <img 
-                            src="https://placehold.co/400x300/a5b4fc/ffffff?text=Product+Image+Missing" 
-                            alt="No Image Available for {{ product.name }}" 
-                            class="w-full h-full object-cover"
-                        >
-                    {% endif %}
-                </div>
-                
-                <div class="p-4">
-                    <h2 class="text-xl font-semibold text-gray-800 truncate mb-1">{{ product.name }}</h2>
-                    <p class="text-sm text-indigo-600 font-medium mb-3">
-                        สถานะ: <span class="font-bold">{{ product.get_status_display }}</span>
-                    </p>
-                    <p class="text-gray-600 text-sm mb-4 line-clamp-2">{{ product.description|truncatechars:100 }}</p>
+            
+            <!-- ใช้ตัวแปร 'products' ที่มาจาก ProductListView -->
+            {% if products %}
+                {% for product in products %}
                     
-                    <a href="{% url 'products:product_detail' slug=product.slug %}"
-                       class="w-full block text-center bg-indigo-500 text-white py-2 rounded-md hover:bg-indigo-600 transition duration-150 font-medium">
-                        ดูรายละเอียด/สั่งซื้อ
+                    {% comment %} 
+                        *** การแก้ไขราคา: ดึงราคาจาก List ที่ถูก Prefetch มาแล้ว ***
+                        เราใช้ 'default_variant_list' ซึ่งถูก Prefetch มาจาก View 
+                        (ProductVariant ที่มี is_default=True หรือตัวแรก)
+                        การใช้ product.default_variant_list.0 เป็นการดึง Variant ตัวแรกจาก List ที่โหลดไว้แล้ว
+                    {% endcomment %}
+                    
+                    {# ดึง Variant ตัวแรกจาก List ที่ Prefetch มาแล้ว #}
+                    {% with product.default_variant_list.0 as default_variant %}
+
+                    <!-- ลิงก์ไปยังหน้ารายละเอียดสินค้า -->
+                    <a href="{% url 'products:product_detail' slug=product.slug %}" class="block">
+                        <div class="bg-white rounded-xl shadow-lg hover:shadow-2xl transition duration-300 ease-in-out transform hover:-translate-y-1 overflow-hidden group">
+                            
+                            <!-- รูปภาพสินค้า -->
+                            <div class="w-full h-56 bg-gray-100 flex items-center justify-center relative overflow-hidden">
+                                {% if product.image %}
+                                    <!-- ใช้รูปภาพจาก model ถ้ามี -->
+                                    <img src="{{ product.image.url }}" alt="{{ product.name }}" class="w-full h-full object-cover transition duration-500 group-hover:opacity-80">
+                                {% else %}
+                                    <!-- Placeholder หากไม่มีรูปภาพ -->
+                                    <img src="https://placehold.co/600x400/3730A3/ffffff?text=DUO+Item" alt="{{ product.name }}" class="w-full h-full object-cover">
+                                {% endif %}
+                                <div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
+                            </div>
+                            
+                            <!-- รายละเอียดสินค้า -->
+                            <div class="p-4">
+                                <h3 class="mt-1 text-lg font-semibold text-gray-900 line-clamp-2">
+                                    {{ product.name }}
+                                </h3>
+                                <p class="mt-1 text-sm text-gray-500 line-clamp-2">
+                                    {{ product.description|truncatechars:50 }}
+                                </p>
+                                <div class="mt-4 flex items-center justify-between">
+                                    <span class="text-xl font-bold text-indigo-600">
+                                        {% if default_variant %}
+                                            {# ใช้ราคาจาก variant ตัวแรกใน List ที่ Prefetch มาแล้ว #}
+                                            {{ default_variant.current_price|floatformat:2 }} 
+                                        {% else %}
+                                            {# แสดงข้อความนี้ถ้าไม่พบราคา #}
+                                            - 
+                                        {% endif %}
+                                        <span class="text-base font-normal text-indigo-500">บาท</span>
+                                    </span>
+                                    <span class="bg-indigo-100 text-indigo-800 text-xs font-medium px-3 py-1 rounded-full">
+                                        {{ product.get_status_display }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
                     </a>
+                    {% endwith %}
+                {% endfor %}
+                
+                <!-- Paginator (ถ้ามีสินค้ามากกว่า 12 ชิ้น) -->
+                {% if is_paginated %}
+                    <div class="col-span-full flex justify-center mt-6">
+                        {% comment %} โค้ดสำหรับ Paginator {% endcomment %}
+                    </div>
+                {% endif %}
+                
+            {% else %}
+                <!-- ข้อความแสดงเมื่อไม่มีสินค้าใน QuerySet -->
+                <div class="col-span-full text-center py-20 bg-white rounded-xl shadow-lg border border-gray-100">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto h-12 w-12 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 19.172A4 4 0 018 18V6.828a4 4 0 011.172-2.828l5-5c1.563-1.563 4.094-1.563 5.657 0s1.563 4.094 0 5.657l-5 5a4 4 0 01-2.828 1.172z" />
+                    </svg>
+                    <h3 class="mt-2 text-lg font-medium text-gray-900">ไม่พบสินค้า Pre-order หรือสินค้าพร้อมจำหน่าย</h3>
+                    <p class="mt-1 text-sm text-gray-500">
+                        กรุณาตรวจสอบสถานะสินค้าในระบบหลังบ้าน (Admin)
+                    </p>
                 </div>
-            </div>
-            {% endfor %}
+            {% endif %}
+            
         </div>
-    {% else %}
-        <p class="text-center text-gray-500 text-lg py-10">ขออภัย ยังไม่มีสินค้า Pre-order ในขณะนี้</p>
-    {% endif %}
-</div>
+    </div>
 {% endblock %}
